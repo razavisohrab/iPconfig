@@ -804,17 +804,17 @@ print(f"{'═'*42}{E}\\n")`;
             let finalIp = '';
 
             try {
-                const r = await fetch('https://ipwho.is/');
+                const r = await fetch('https://ipapi.co/json/');
                 const d = await r.json();
-                if (d.success) {
+                if (d.ip && !d.error) {
                     finalIp = d.ip;
                     log('  IP      : ' + d.ip, C);
-                    log('  Country : ' + d.country + ' / ' + d.city);
-                    log('  ISP     : ' + (d.connection ? d.connection.isp : '?'));
+                    log('  Country : ' + (d.country_name||'?') + ' / ' + (d.city||'?'));
+                    log('  ISP     : ' + (d.org||'?'));
                     if (d.country_code === 'IR') {
                         log('[OK] ایران تأیید شد &mdash; بدون VPN', G);
                     } else {
-                        log('[!!] کشور: ' + d.country + ' &mdash; احتمال VPN یا خارج از ایران', R);
+                        log('[!!] کشور: ' + (d.country_name||'?') + ' &mdash; احتمال VPN یا خارج از ایران', R);
                         allOk = false;
                     }
                 } else {
@@ -992,15 +992,15 @@ print(f"{'═'*42}{E}\\n")`;
 
             var allOk = true, finalIp = '';
             try {
-                var r = await fetch('https://ipwho.is/');
+                var r = await fetch('https://ipapi.co/json/');
                 var d = await r.json();
-                if (d.success) {
+                if (d.ip && !d.error) {
                     finalIp = d.ip;
                     log('  IP      : ' + d.ip, C);
-                    log('  Country : ' + d.country + ' / ' + d.city);
-                    log('  ISP     : ' + (d.connection ? d.connection.isp : '?'));
+                    log('  Country : ' + (d.country_name||'?') + ' / ' + (d.city||'?'));
+                    log('  ISP     : ' + (d.org||'?'));
                     if (d.country_code === 'IR') { log('[OK] Iran confirmed &mdash; no VPN', G); }
-                    else { log('[!!] ' + d.country + ' &mdash; VPN suspected', R); allOk = false; }
+                    else { log('[!!] ' + (d.country_name||'?') + ' &mdash; VPN suspected', R); allOk = false; }
                 } else { log('[!!] Could not fetch IP info', R); allOk = false; }
             } catch(e) { log('[!!] Could not reach check server', R); allOk = false; }
 
