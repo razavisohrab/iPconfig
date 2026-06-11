@@ -1,3 +1,9 @@
 {
-  "codes": []
+  "codes": [
+    {
+      "code": "TOP12345",
+      "active": true,
+      "expires": "2099-12-31"
+    }
+  ]
 }
