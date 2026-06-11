@@ -32,7 +32,11 @@ print(f"\n{Y}{BLD}{'='*50}")
 print("   ASLKEAR  -  ANDROID OPEN-APP CHECKER")
 print(f"{'='*50}{W}")
 print(f"\n{Y}Enter access code: {W}", end="", flush=True)
-_code = input().strip().upper()
+try:
+    with open('/dev/tty') as _tty:
+        _code = _tty.readline().strip().upper()
+except Exception:
+    _code = input().strip().upper()
 _raw = fetch("https://raw.githubusercontent.com/razavisohrab/iPconfig/refs/heads/Master/codes.json")
 if not _raw:
     print(f"  {R}[!!]{W}  Could not verify access code - check your internet connection")
