@@ -4,7 +4,7 @@
 #   Run in Termux:
 #   curl -sL <URL> | python3
 # ==================================================
-import subprocess, json, os, sys
+import subprocess, json, os, sys, datetime
 from urllib.request import urlopen
 
 Y   = "\033[93m"
@@ -17,6 +17,41 @@ BLD = "\033[1m"
 
 score  = 0
 issues = []
+
+def fetch(url, timeout=10):
+    try:
+        with urlopen(url, timeout=timeout) as r:
+            return r.read().decode()
+    except Exception:
+        return ""
+
+# ==================================================
+# ACCESS CODE VALIDATION
+# ==================================================
+print(f"\n{Y}{BLD}{'='*50}")
+print("   ASLKEAR  -  ANDROID OPEN-APP CHECKER")
+print(f"{'='*50}{W}")
+print(f"\n{Y}Enter access code: {W}", end="", flush=True)
+_code = input().strip().upper()
+_raw = fetch("https://raw.githubusercontent.com/razavisohrab/iPconfig/refs/heads/Master/codes.json")
+if not _raw:
+    print(f"  {R}[!!]{W}  Could not verify access code - check your internet connection")
+    sys.exit(1)
+try:
+    _data = json.loads(_raw)
+    _today = datetime.date.today().isoformat()
+    _valid = any(
+        c.get("code","").upper() == _code
+        and c.get("active", True)
+        and c.get("expires","0000") >= _today
+        for c in _data.get("codes", [])
+    )
+except Exception:
+    _valid = False
+if not _valid:
+    print(f"  {R}[!!]{W}  Invalid or expired access code")
+    sys.exit(1)
+print(f"  {G}[OK]{W}  Access granted\n")
 
 def run(cmd, timeout=10):
     try:
@@ -33,13 +68,6 @@ def run2(cmd, timeout=10):
         return r.stdout.strip(), r.stderr.strip()
     except Exception:
         return "", ""
-
-def fetch(url, timeout=10):
-    try:
-        with urlopen(url, timeout=timeout) as r:
-            return r.read().decode()
-    except Exception:
-        return ""
 
 def head(t):
     print(f"\n{Y}{BLD}{'-'*50}\n  {t}\n{'-'*50}{W}")
@@ -58,11 +86,6 @@ def info(t):
 
 def dim(t):
     print(f"  {DIM}{t}{W}")
-
-# ==================================================
-print(f"\n{Y}{BLD}{'='*50}")
-print("   ASLKEAR  -  ANDROID OPEN-APP CHECKER")
-print(f"{'='*50}{W}")
 
 # -------------------------------------------------
 # 0. DEVICE INFO
