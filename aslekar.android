@@ -122,7 +122,7 @@ if not found_any:
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # ZYGISK SOCKET DETECTION
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-head("1b / Zygisk Socket Detection")
+head("1b / Zygisk + Magisk Socket Detection")
 
 unix_raw = run("cat /proc/net/unix 2>/dev/null")
 zygisk_hits = [l.strip() for l in unix_raw.splitlines()
@@ -132,7 +132,45 @@ if zygisk_hits:
     for h in zygisk_hits[:4]:
         warn(f"Zygisk/Magisk socket found: {h[-60:]}", 50)
 else:
-    ok("No Zygisk / Magisk sockets found in /proc/net/unix")
+    ok("No Zygisk / Magisk sockets in /proc/net/unix")
+
+# Direct socket connect (bypasses Shamiko /proc/net/unix hiding)
+import socket as _sock
+for sock_name in [b'\x00magisk_daemon', b'\x00magiskd', b'\x00zygisk_daemon']:
+    try:
+        s = _sock.socket(_sock.AF_UNIX, _sock.SOCK_STREAM)
+        s.settimeout(1)
+        s.connect(sock_name)
+        warn(f"Magisk socket responded: {sock_name[1:].decode()} [Shamiko bypass]", 60)
+        s.close()
+    except ConnectionRefusedError:
+        warn(f"Socket exists but refused: {sock_name[1:].decode()} [suspicious]", 40)
+    except Exception:
+        pass
+
+ok("No Magisk socket connection") if not any(
+    x[0].startswith('Magisk socket') or x[0].startswith('Socket exists')
+    for x in issues[-6:]
+) else None
+
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# MOUNT NAMESPACE MISMATCH (Shamiko detection)
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+head("1d / Mount Namespace Mismatch (Shamiko)")
+
+try:
+    pid1_count = int(run("cat /proc/1/mountinfo 2>/dev/null | wc -l") or 0)
+    self_count  = int(run("cat /proc/self/mountinfo 2>/dev/null | wc -l") or 0)
+    diff = abs(pid1_count - self_count)
+    info(f"PID 1 mounts: {pid1_count}  |  Self mounts: {self_count}  |  Diff: {diff}")
+    if diff > 40:
+        warn(f"Mount namespace mismatch: diff={diff} - Shamiko manipulation suspected", 50)
+    elif diff > 20:
+        warn(f"Mount namespace difference: diff={diff} - slightly suspicious", 20)
+    else:
+        ok(f"Mount namespace consistent (diff={diff})")
+except Exception:
+    dim("Could not compare mount namespaces")
 
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # PLAY INTEGRITY SIGNAL
