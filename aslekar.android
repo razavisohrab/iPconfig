@@ -119,6 +119,38 @@ if su_path and 'com.termux' not in su_path:
 if not found_any:
     ok("No root / Magisk / KernelSU / APatch paths found")
 
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ZYGISK SOCKET DETECTION
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+head("1b / Zygisk Socket Detection")
+
+unix_raw = run("cat /proc/net/unix 2>/dev/null")
+zygisk_hits = [l.strip() for l in unix_raw.splitlines()
+               if any(x in l.lower() for x in ['@zygisk','@magisk_daemon','@magiskd'])]
+
+if zygisk_hits:
+    for h in zygisk_hits[:4]:
+        warn(f"Zygisk/Magisk socket found: {h[-60:]}", 50)
+else:
+    ok("No Zygisk / Magisk sockets found in /proc/net/unix")
+
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# PLAY INTEGRITY SIGNAL
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+head("1c / Play Integrity Signal")
+
+vbs  = run("getprop ro.boot.verifiedbootstate")
+vbmeta = run("getprop ro.boot.vbmeta.device_state")
+print(f"  {DIM}ro.boot.verifiedbootstate   = {vbs or '(empty)'}{W}")
+print(f"  {DIM}ro.boot.vbmeta.device_state = {vbmeta or '(empty)'}{W}")
+
+if vbs == 'green' and vbmeta == 'locked':
+    ok("Boot state: VERIFIED GREEN + LOCKED -  Play Integrity likely PASSES")
+elif vbs in ('yellow','orange') or vbmeta == 'unlocked':
+    warn(f"Boot state: {vbs} / {vbmeta} - Play Integrity likely FAILS", 40)
+else:
+    warn(f"Boot state unknown: {vbs} / {vbmeta}", 20)
+
 # -------------------------------------------------
 # 2. SYSTEM PROPERTIES
 # -------------------------------------------------
@@ -182,6 +214,15 @@ DANGER = {
     'com.excelliance.dualaid':          ('Dual Space',      20),
     'com.lexa.fakegps':                 ('Fake GPS',        20),
     'com.incorporateapps.fakegps.fre':  ('Fake GPS Free',   20),
+    # Play Integrity bypass tools
+    'com.chiteroman.playintegrityfix':       ('PlayIntegrityFix',  50),
+    'io.github.chiteroman.playintegrityfix': ('PlayIntegrityFix',  50),
+    'es.chiteroman.playintegrityfix':        ('PlayIntegrityFix',  50),
+    'io.github.xposed.trickstore':           ('TrickyStore',       50),
+    'com.aviraxp.adblocker':                 ('TrickyStore',       50),
+    # Zygisk standalone
+    'com.github.rezygisk':                   ('ReZygisk',          40),
+    'github.rezygisk':                       ('ReZygisk',          40),
 }
 
 pkg_list = run("pm list packages 2>/dev/null")
