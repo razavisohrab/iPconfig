@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # ==================================================
-#   ASLKEAR â€” Android Open-App Auto Checker
+#   ASLKEAR -Android Open-App Auto Checker
 #   Run in Termux:
 #   curl -sL <URL> | python3
 # ==================================================
@@ -108,7 +108,7 @@ for path, label, pts in PRIV_PATHS:
         warn(f"[{label}] found at {path}", pts)
         found_any = True
 
-# Check su â€” ignore Termux's own stub
+# Check su -ignore Termux's own stub
 su_path = run("which su 2>/dev/null")
 if su_path and 'com.termux' not in su_path:
     su_test = run("su -c id 2>/dev/null")
@@ -131,7 +131,7 @@ PROPS = [
     ('ro.allow.mock.location',      '0',            False),
     ('ro.boot.verifiedbootstate',   'green',        False),
     ('ro.boot.vbmeta.device_state', 'locked',       False),
-    ('sys.oem_unlock_allowed',      '0',            False),
+    # sys.oem_unlock_allowed skipped -always 1 on Xiaomi/POCO (false positive)
     ('persist.zygisk.enable',       '1',            True),
     ('persist.susfs.enabled',       '1',            True),
 ]
@@ -207,20 +207,22 @@ mount_lines = [l for l in mounts_raw.splitlines() if l.strip()]
 count = len(mount_lines)
 info(f"Mount count: {count}")
 
-if count > 200:
+if count > 300:
     warn(f"Mount count very high: {count}  [Magisk Magic Mount likely]", 50)
-elif count > 130:
+elif count > 250:
     warn(f"Mount count suspicious: {count}", 25)
 else:
     ok(f"Mount count normal: {count}")
 
+# Only flag mounts that specifically point to Magisk/KernelSU paths
 suspicious = [l.strip() for l in mount_lines
-              if any(x in l.lower() for x in ['overlay','/data/adb','magisk','susfs'])]
+              if any(x in l.lower() for x in ['/data/adb/magisk','/data/adb/modules',
+                                               '/data/adb/ksu','/data/adb/apatch','susfs'])]
 if suspicious:
     for m in suspicious[:4]:
         warn(f"Suspicious mount: {m[:65]}", 20)
 else:
-    ok("No OverlayFS / Magisk mounts found")
+    ok("No Magisk / KernelSU mounts found")
 
 # -------------------------------------------------
 # 5. SELINUX
@@ -232,7 +234,7 @@ selinux = run("cat /sys/fs/selinux/enforce 2>/dev/null") or \
 info(f"SELinux: {selinux or '(unreadable)'}")
 
 if selinux in ('0', 'Permissive', 'permissive'):
-    warn("SELinux is Permissive â€” root likely active", 30)
+    warn("SELinux is Permissive -root likely active", 30)
 elif selinux in ('1', 'Enforcing', 'enforcing'):
     ok("SELinux is Enforcing")
 else:
@@ -241,7 +243,7 @@ else:
 # -------------------------------------------------
 # 6. IP + LOCATION + VPN
 # -------------------------------------------------
-head("6 / IP â€” Location â€” VPN Check")
+head("6 / IP -Location -VPN Check")
 
 final_ip = ""
 raw = fetch("http://ip-api.com/json?fields=status,message,country,countryCode,city,isp,org,proxy,hosting,query")
@@ -254,11 +256,11 @@ if raw:
             info(f"Country : {d.get('country','?')} / {d.get('city','?')}")
             info(f"ISP     : {d.get('isp','?')}")
             if d.get('proxy') or d.get('hosting'):
-                warn("VPN / Proxy detected â€” NOT allowed", 40)
+                warn("VPN / Proxy detected -NOT allowed", 40)
             elif d.get('countryCode') == 'IR':
-                ok("Iran confirmed â€” no VPN detected")
+                ok("Iran confirmed -no VPN detected")
             else:
-                warn(f"Country: {d.get('country','?')} â€” VPN or outside Iran suspected", 40)
+                warn(f"Country: {d.get('country','?')} -VPN or outside Iran suspected", 40)
         else:
             warn(f"IP check error: {d.get('message','?')}", 0)
     except Exception:
@@ -284,7 +286,7 @@ else:
 # -------------------------------------------------
 # 8. DNS CHECK + DNS CHANGER
 # -------------------------------------------------
-head("8 / DNS Check â€” DNS Changer Detect")
+head("8 / DNS Check -DNS Changer Detect")
 
 dns_raw = run("nslookup google.com 2>/dev/null")
 if dns_raw:
@@ -308,7 +310,7 @@ for name, ips in DNS_CHANGERS.items():
             break
 
 if dc_found:
-    warn(f"DNS changed: {dc_found[0]} ({dc_found[1]}) â€” NOT allowed", 25)
+    warn(f"DNS changed: {dc_found[0]} ({dc_found[1]}) -NOT allowed", 25)
 else:
     ok("No DNS Changer detected")
 
@@ -324,7 +326,7 @@ cf_ip = next((l.split('=')[1] for l in (cf or '').splitlines()
 if cf_ip:
     info(f"Cloudflare edge: {cf_ip}")
     if final_ip and cf_ip != final_ip:
-        warn("IP mismatch â€” DNS Leak suspected", 20)
+        warn("IP mismatch -DNS Leak suspected", 20)
     else:
         ok("No DNS Leak detected")
 else:
@@ -339,16 +341,16 @@ print(f"{Y}{'-'*50}{W}")
 
 if score == 0:
     lvl, col = "PASS", G
-    note = "No issues found â€” open-app approved"
+    note = "No issues found -open-app approved"
 elif score < 30:
     lvl, col = "LOW RISK", Y
-    note = "Minor flags â€” manual review recommended"
+    note = "Minor flags -manual review recommended"
 elif score < 60:
     lvl, col = "MEDIUM RISK", Y
-    note = "Issues detected â€” further review required"
+    note = "Issues detected -further review required"
 else:
     lvl, col = "CRITICAL", R
-    note = "Device suspicious â€” open-app NOT approved"
+    note = "Device suspicious -open-app NOT approved"
 
 print(f"\n  {col}{BLD}[ {lvl} ]  score: {score}{W}")
 print(f"  {col}{note}{W}\n")
@@ -359,5 +361,5 @@ if issues:
         print(f"  {R}  . {txt}  (+{pts}){W}")
 
 print(f"\n{Y}{BLD}{'='*50}{W}")
-print(f"{Y}{BLD}   CHECK COMPLETE â€” ASLKEAR{W}")
+print(f"{Y}{BLD}   CHECK COMPLETE -ASLKEAR{W}")
 print(f"{Y}{BLD}{'='*50}{W}\n")
