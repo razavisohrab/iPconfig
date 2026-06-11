@@ -7,31 +7,6 @@
 import subprocess, json, os, sys
 from urllib.request import urlopen
 
-# ── BiDi fix for Persian in LTR terminal ─────────
-def _install(pkg):
-    subprocess.run([sys.executable,'-m','pip','install',pkg,'-q',
-                    '--disable-pip-version-check'],
-                   capture_output=True, timeout=30)
-
-try:
-    from bidi.algorithm import get_display as _bidi
-except ImportError:
-    _install('python-bidi')
-    try:
-        from bidi.algorithm import get_display as _bidi
-    except ImportError:
-        _bidi = None
-
-def fa(t):
-    """Fix Persian text for LTR terminal display."""
-    if _bidi:
-        try:
-            return _bidi(str(t), base_dir='R')
-        except Exception:
-            pass
-    return t
-
-# ── Colors ────────────────────────────────────────
 Y   = "\033[93m"
 R   = "\033[91m"
 G   = "\033[92m"
@@ -70,37 +45,32 @@ def head(t):
     print(f"\n{Y}{BLD}{'─'*50}\n  {t}\n{'─'*50}{W}")
 
 def ok(t):
-    print(f"  {G}[OK]{W}  {fa(t)}")
+    print(f"  {G}[OK]{W}  {t}")
 
 def warn(t, pts=10):
     global score
     score += pts
     issues.append((t, pts))
-    print(f"  {R}[!!]{W}  {fa(t)}")
+    print(f"  {R}[!!]{W}  {t}")
 
 def info(t):
-    print(f"  {C} > {W} {fa(t)}")
+    print(f"  {C} > {W} {t}")
 
 def dim(t):
     print(f"  {DIM}{t}{W}")
 
 # ══════════════════════════════════════════════════
-print(f"\n{Y}{BLD}{'=':=<50}")
+print(f"\n{Y}{BLD}{'='*50}")
 print("   ASLKEAR  -  ANDROID OPEN-APP CHECKER")
-print(f"{'=':=<50}{W}")
+print(f"{'='*50}{W}")
 
 # ─────────────────────────────────────────────────
 # 0. DEVICE INFO
 # ─────────────────────────────────────────────────
 head("0 / Device Info")
-model   = run("getprop ro.product.model")
-brand   = run("getprop ro.product.brand")
-android = run("getprop ro.build.version.release")
-sdk     = run("getprop ro.build.version.sdk")
-build   = run("getprop ro.build.tags")
-print(f"  {C} > {W} Device  : {brand} {model}")
-print(f"  {C} > {W} Android : {android}  (SDK {sdk})")
-print(f"  {C} > {W} Build   : {build}")
+info(f"Device  : {run('getprop ro.product.brand')} {run('getprop ro.product.model')}")
+info(f"Android : {run('getprop ro.build.version.release')}  (SDK {run('getprop ro.build.version.sdk')})")
+info(f"Build   : {run('getprop ro.build.tags')}")
 
 # ─────────────────────────────────────────────────
 # 1. ROOT PATH DETECTION
@@ -118,37 +88,36 @@ ROOT_PATHS = [
     ('/dev/magisk',                       'Magisk device'),
 ]
 PRIV_PATHS = [
-    ('/data/adb/magisk',    'Magisk',      50),
-    ('/data/adb/magisk.db', 'Magisk DB',   50),
-    ('/data/adb/ksud',      'KernelSU',    50),
-    ('/data/adb/ksu',       'KernelSU dir',50),
-    ('/data/adb/apatch',    'APatch',      50),
+    ('/data/adb/magisk',    'Magisk',       50),
+    ('/data/adb/magisk.db', 'Magisk DB',    50),
+    ('/data/adb/ksud',      'KernelSU',     50),
+    ('/data/adb/ksu',       'KernelSU dir', 50),
+    ('/data/adb/apatch',    'APatch',       50),
 ]
 
 found_any = False
 for path, label in ROOT_PATHS:
     if os.path.exists(path):
-        warn(f"{label} پیدا شد  [{path}]", 30)
+        warn(f"[{label}] found at {path}", 30)
         found_any = True
 
 for path, label, pts in PRIV_PATHS:
     out, err = run2(f"ls '{path}' 2>&1")
     full = (out + err).lower()
     if 'permission denied' in full or 'not permitted' in full:
-        warn(f"{label} - مسیر موجود است (دسترسی بلاک)  [{path}]", pts)
+        warn(f"[{label}] path exists (access blocked) -> {path}", pts)
         found_any = True
-    elif 'no such' not in full and (out or ('no such' not in err)):
-        if out:
-            warn(f"{label} پیدا شد  [{path}]", pts)
-            found_any = True
+    elif 'no such' not in full and out:
+        warn(f"[{label}] found at {path}", pts)
+        found_any = True
 
 su_path = run("which su 2>/dev/null")
 if su_path:
-    warn(f"دستور su در PATH موجود است: {su_path}", 25)
+    warn(f"su command found in PATH: {su_path}", 25)
     found_any = True
 
 if not found_any:
-    ok("مسیر Root / Magisk / KernelSU / APatch شناسایی نشد")
+    ok("No root / Magisk / KernelSU / APatch paths found")
 
 # ─────────────────────────────────────────────────
 # 2. SYSTEM PROPERTIES
@@ -173,19 +142,19 @@ for prop, expected, flag_if_eq in PROPS:
     display = val if val else "(empty)"
     if flag_if_eq:
         if val == expected:
-            warn(f"{prop} = {display}  [مشکوک]", 20)
+            warn(f"{prop} = {display}  [SUSPICIOUS]", 20)
             prop_ok = False
         else:
             dim(f"{prop} = {display}")
     else:
         if val and val != expected:
-            warn(f"{prop} = {display}  [باید: {expected}]", 20)
+            warn(f"{prop} = {display}  [expected: {expected}]", 20)
             prop_ok = False
         else:
             dim(f"{prop} = {display}")
 
 if prop_ok:
-    ok("تمام پراپرتی‌ها سالم هستند")
+    ok("All system properties look clean")
 
 # ─────────────────────────────────────────────────
 # 3. DANGEROUS PACKAGES
@@ -223,37 +192,35 @@ for pkg, (name, pts) in DANGER.items():
 
 if found_pkgs:
     for name, pkg, pts in found_pkgs:
-        warn(f"{name} نصب است  [{pkg}]", pts)
+        warn(f"[{name}] installed  [{pkg}]", pts)
 else:
-    ok("پکیج مشکوک شناسایی نشد")
+    ok("No suspicious packages found")
 
 # ─────────────────────────────────────────────────
 # 4. MOUNT ANALYSIS
 # ─────────────────────────────────────────────────
 head("4 / Mount Namespace Analysis")
 
-mounts_raw = run("cat /proc/mounts 2>/dev/null")
-if not mounts_raw:
-    mounts_raw = run("cat /proc/self/mountinfo 2>/dev/null")
-
+mounts_raw = run("cat /proc/mounts 2>/dev/null") or \
+             run("cat /proc/self/mountinfo 2>/dev/null")
 mount_lines = [l for l in mounts_raw.splitlines() if l.strip()]
 count = len(mount_lines)
-print(f"  {C} > {W} Mount count: {count}")
+info(f"Mount count: {count}")
 
 if count > 200:
-    warn(f"Mount count بسیار بالا: {count}  [Magisk Magic Mount احتمالی]", 50)
+    warn(f"Mount count very high: {count}  [Magisk Magic Mount likely]", 50)
 elif count > 130:
-    warn(f"Mount count مشکوک: {count}", 25)
+    warn(f"Mount count suspicious: {count}", 25)
 else:
-    ok(f"Mount count عادی: {count}")
+    ok(f"Mount count normal: {count}")
 
 suspicious = [l.strip() for l in mount_lines
               if any(x in l.lower() for x in ['overlay','/data/adb','magisk','susfs'])]
 if suspicious:
     for m in suspicious[:4]:
-        warn(f"Mount مشکوک: {m[:65]}", 20)
+        warn(f"Suspicious mount: {m[:65]}", 20)
 else:
-    ok("OverlayFS / Magisk mount شناسایی نشد")
+    ok("No OverlayFS / Magisk mounts found")
 
 # ─────────────────────────────────────────────────
 # 5. SELINUX
@@ -262,14 +229,14 @@ head("5 / SELinux Status")
 
 selinux = run("cat /sys/fs/selinux/enforce 2>/dev/null") or \
           run("getenforce 2>/dev/null")
+info(f"SELinux: {selinux or '(unreadable)'}")
 
-print(f"  {C} > {W} SELinux: {selinux or '(unreadable)'}")
-if selinux in ('0','Permissive','permissive'):
-    warn("SELinux غیرفعال است (Permissive) — Root احتمالی", 30)
-elif selinux in ('1','Enforcing','enforcing'):
-    ok("SELinux فعال است (Enforcing)")
+if selinux in ('0', 'Permissive', 'permissive'):
+    warn("SELinux is Permissive — root likely active", 30)
+elif selinux in ('1', 'Enforcing', 'enforcing'):
+    ok("SELinux is Enforcing")
 else:
-    dim("SELinux — وضعیت نامشخص")
+    dim("SELinux status unknown")
 
 # ─────────────────────────────────────────────────
 # 6. IP + LOCATION + VPN
@@ -282,22 +249,22 @@ if raw:
     try:
         d = json.loads(raw)
         if d.get('status') == 'success':
-            final_ip = d.get('query','')
-            print(f"  {C} > {W} IP      : {C}{final_ip}{W}")
-            print(f"  {C} > {W} Country : {d.get('country','?')} / {d.get('city','?')}")
-            print(f"  {C} > {W} ISP     : {d.get('isp','?')}")
+            final_ip = d.get('query', '')
+            info(f"IP      : {C}{final_ip}{W}")
+            info(f"Country : {d.get('country','?')} / {d.get('city','?')}")
+            info(f"ISP     : {d.get('isp','?')}")
             if d.get('proxy') or d.get('hosting'):
-                warn("VPN / Proxy شناسایی شد — مجاز نیست", 40)
+                warn("VPN / Proxy detected — NOT allowed", 40)
             elif d.get('countryCode') == 'IR':
-                ok("ایران تایید شد — بدون VPN")
+                ok("Iran confirmed — no VPN detected")
             else:
-                warn(f"کشور {d.get('country','?')} — احتمال VPN یا خارج از ایران", 40)
+                warn(f"Country: {d.get('country','?')} — VPN or outside Iran suspected", 40)
         else:
-            warn(f"خطا: {d.get('message','?')}", 0)
+            warn(f"IP check error: {d.get('message','?')}", 0)
     except Exception:
-        warn("خطا در پارس پاسخ IP", 0)
+        warn("Failed to parse IP response", 0)
 else:
-    warn("اتصال به سرور بررسی ممکن نبود", 0)
+    warn("Could not reach IP check server", 0)
 
 # ─────────────────────────────────────────────────
 # 7. VPN INTERFACE
@@ -310,9 +277,9 @@ found_iface = [i for i in VPN_IFACES if i in ifaces]
 
 if found_iface:
     for iface in found_iface:
-        warn(f"VPN Interface فعال است: {iface}", 35)
+        warn(f"VPN interface active: {iface}", 35)
 else:
-    ok("VPN Interface شناسایی نشد")
+    ok("No VPN interfaces found")
 
 # ─────────────────────────────────────────────────
 # 8. DNS CHECK + DNS CHANGER
@@ -325,13 +292,13 @@ if dns_raw:
         dim(line)
 
 DNS_CHANGERS = {
-    'Shecan':      ['178.22.122.100','185.51.200.2'],
-    'Electro':     ['78.157.42.100', '78.157.42.101'],
-    '403.online':  ['10.202.10.202', '10.202.10.102'],
-    'Radar':       ['10.202.10.10',  '10.202.10.11'],
-    'Begzar':      ['185.55.226.26', '185.55.225.25'],
-    'Google DNS':  ['8.8.8.8',       '8.8.4.4'],
-    'Cloudflare':  ['1.1.1.1',       '1.0.0.1'],
+    'Shecan':      ['178.22.122.100', '185.51.200.2'],
+    'Electro':     ['78.157.42.100',  '78.157.42.101'],
+    '403.online':  ['10.202.10.202',  '10.202.10.102'],
+    'Radar':       ['10.202.10.10',   '10.202.10.11'],
+    'Begzar':      ['185.55.226.26',  '185.55.225.25'],
+    'Google DNS':  ['8.8.8.8',        '8.8.4.4'],
+    'Cloudflare':  ['1.1.1.1',        '1.0.0.1'],
 }
 
 dc_found = None
@@ -342,9 +309,9 @@ for name, ips in DNS_CHANGERS.items():
             break
 
 if dc_found:
-    warn(f"DNS تغییر یافته: {dc_found[0]} ({dc_found[1]}) — مجاز نیست", 25)
+    warn(f"DNS changed: {dc_found[0]} ({dc_found[1]}) — NOT allowed", 25)
 else:
-    ok("DNS Changer شناسایی نشد")
+    ok("No DNS Changer detected")
 
 # ─────────────────────────────────────────────────
 # 9. DNS LEAK TEST
@@ -356,42 +323,42 @@ cf_ip = next((l.split('=')[1] for l in (cf or '').splitlines()
               if l.startswith('ip=')), '')
 
 if cf_ip:
-    print(f"  {C} > {W} Cloudflare edge: {cf_ip}")
+    info(f"Cloudflare edge: {cf_ip}")
     if final_ip and cf_ip != final_ip:
-        warn("IP ناهماهنگ — احتمال DNS Leak", 20)
+        warn("IP mismatch — DNS Leak suspected", 20)
     else:
-        ok("DNS Leak شناسایی نشد")
+        ok("No DNS Leak detected")
 else:
-    ok("DNS Leak شناسایی نشد")
+    ok("No DNS Leak detected")
 
 # ══════════════════════════════════════════════════
 # SUMMARY
 # ══════════════════════════════════════════════════
-print(f"\n{Y}{BLD}{'=':=<50}{W}")
+print(f"\n{Y}{BLD}{'='*50}{W}")
 print(f"{Y}{BLD}   RESULT SUMMARY{W}")
 print(f"{Y}{'─'*50}{W}")
 
 if score == 0:
     lvl, col = "PASS", G
-    note = "هیچ مشکلی شناسایی نشد — اوپن‌اپ مجاز است"
+    note = "No issues found — open-app approved"
 elif score < 30:
     lvl, col = "LOW RISK", Y
-    note = "موارد جزئی — بررسی دستی توصیه می‌شود"
+    note = "Minor flags — manual review recommended"
 elif score < 60:
     lvl, col = "MEDIUM RISK", Y
-    note = "مشکل شناسایی شد — نیاز به بررسی بیشتر"
+    note = "Issues detected — further review required"
 else:
     lvl, col = "CRITICAL", R
-    note = "دستگاه مشکوک — اوپن‌اپ مجاز نیست"
+    note = "Device suspicious — open-app NOT approved"
 
 print(f"\n  {col}{BLD}[ {lvl} ]  score: {score}{W}")
-print(f"  {col}{fa(note)}{W}\n")
+print(f"  {col}{note}{W}\n")
 
 if issues:
-    print(f"  {R}{BLD}{fa('موارد شناسایی‌شده:')}{W}")
+    print(f"  {R}{BLD}Detected issues:{W}")
     for txt, pts in issues:
-        print(f"  {R}  . {fa(txt)}  (+{pts}){W}")
+        print(f"  {R}  . {txt}  (+{pts}){W}")
 
-print(f"\n{Y}{BLD}{'=':=<50}{W}")
+print(f"\n{Y}{BLD}{'='*50}{W}")
 print(f"{Y}{BLD}   CHECK COMPLETE — ASLKEAR{W}")
-print(f"{Y}{BLD}{'=':=<50}{W}\n")
+print(f"{Y}{BLD}{'='*50}{W}\n")
